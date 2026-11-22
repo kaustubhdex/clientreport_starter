@@ -35,3 +35,43 @@ def test_observations_are_deterministic():
     })
     observations = generate_observations(df)
     assert any("10.00x" in text for text in observations)
+
+
+def test_suggest_column_mapping_recognises_common_headers():
+    from reporting import suggest_column_mapping
+
+    columns = ["Date", "Campaign Name", "Platform", "Amount Spent",
+               "Impressions", "Link Clicks", "Purchases", "Sales"]
+    mapping = suggest_column_mapping(columns)
+    assert mapping == {
+        "date": "Date",
+        "campaign": "Campaign Name",
+        "channel": "Platform",
+        "spend": "Amount Spent",
+        "impressions": "Impressions",
+        "clicks": "Link Clicks",
+        "conversions": "Purchases",
+        "revenue": "Sales",
+    }
+
+
+def test_apply_column_mapping_renames_without_mutating_source():
+    from reporting import apply_column_mapping
+
+    source = pd.DataFrame({"Campaign Name": ["Spring"], "Amount Spent": [25]})
+    mapped = apply_column_mapping(source, {
+        "campaign": "Campaign Name",
+        "spend": "Amount Spent",
+    })
+    assert "campaign" in mapped.columns
+    assert "spend" in mapped.columns
+    assert "Campaign Name" in source.columns
+
+
+def test_apply_column_mapping_rejects_duplicate_source_mapping():
+    import pytest
+    from reporting import apply_column_mapping
+
+    source = pd.DataFrame({"Value": [1]})
+    with pytest.raises(ValueError):
+        apply_column_mapping(source, {"spend": "Value", "revenue": "Value"})
