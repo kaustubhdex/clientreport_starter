@@ -111,6 +111,10 @@ def clean_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]
         else:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
+    # Treat blank campaign/channel labels as missing, not valid categories.
+    for col in ["campaign", "channel"]:
+        df[col] = df[col].replace(r"^\\s*$", pd.NA, regex=True)
+
     required_non_null = ["date", "campaign", "channel", *NUMERIC_COLUMNS]
     valid_mask = df[required_non_null].notna().all(axis=1)
     dropped_nulls = int((~valid_mask).sum())
@@ -120,18 +124,33 @@ def clean_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]
     dropped_negative = int((~nonnegative_mask).sum())
     df = df.loc[nonnegative_mask].copy()
 
+    fractional_counts = {}
     for col in ["impressions", "clicks", "conversions"]:
         fractional = (df[col] % 1 != 0)
+        fractional_counts[col] = int(fractional.sum())
         if fractional.any():
             df = df.loc[~fractional].copy()
-            messages.append(f"Rows with fractional {col} values were excluded; counts should be whole numbers.")
+            messages.append(f"{fractional_counts[col]} row(s) with fractional {col} values were excluded; counts should be whole numbers.")
 
     df["impressions"] = df["impressions"].astype("int64")
     df["clicks"] = df["clicks"].astype("int64")
     df["conversions"] = df["conversions"].astype("int64")
     df["date"] = df["date"].dt.date
 
-    # Duplicate rows are flagged, not silently removed, because some exports legitimately contain repeated dates.
+    # These are warnings, not automatic exclusions: attribution and platform definitions can differ.
+    clicks_exceed_impressions = int((df["clicks"] > df["impressions"]).sum())
+    conversions_exceed_clicks = int((df["conversions"] > df["clicks"]).sum())
+    if clicks_exceed_impressions:
+        messages.append(
+            f"Review {clicks_exceed_impressions} row(s) where clicks exceed impressions. "
+            "This may reflect different platform definitions or a source-data issue."
+        )
+    if conversions_exceed_clicks:
+        messages.append(
+            f"Review {conversions_exceed_clicks} row(s) where conversions exceed clicks. "
+            "This may reflect attribution or counting differences."
+        )
+
     duplicate_count = int(df.duplicated().sum())
     if duplicate_count:
         messages.append(f"Found {duplicate_count} exact duplicate row(s). They were retained; review before external reporting.")
