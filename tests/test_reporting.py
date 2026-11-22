@@ -75,3 +75,31 @@ def test_apply_column_mapping_rejects_duplicate_source_mapping():
     source = pd.DataFrame({"Value": [1]})
     with pytest.raises(ValueError):
         apply_column_mapping(source, {"spend": "Value", "revenue": "Value"})
+
+
+def test_blank_labels_are_excluded_and_counted():
+    df = pd.DataFrame({
+        "date": ["2026-01-01", "2026-01-02"],
+        "campaign": ["   ", "B"],
+        "channel": ["Search", "Social"],
+        "spend": [10, 20], "impressions": [100, 200],
+        "clicks": [5, 10], "conversions": [1, 2], "revenue": [50, 80],
+    })
+    cleaned, report = clean_and_validate(df)
+    assert len(cleaned) == 1
+    assert report["dropped_rows"] == 1
+    assert any("missing or invalid required values" in message for message in report["messages"])
+
+
+def test_suspicious_metric_relationships_are_warnings_not_dropped():
+    df = pd.DataFrame({
+        "date": ["2026-01-01"],
+        "campaign": ["A"], "channel": ["Search"],
+        "spend": [10], "impressions": [100], "clicks": [120],
+        "conversions": [130], "revenue": [100],
+    })
+    cleaned, report = clean_and_validate(df)
+    assert len(cleaned) == 1
+    assert report["ok"] is True
+    assert any("clicks exceed impressions" in message for message in report["messages"])
+    assert any("conversions exceed clicks" in message for message in report["messages"])
