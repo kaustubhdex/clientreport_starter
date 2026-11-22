@@ -29,7 +29,7 @@ st.markdown(
     """
     <style>
       .block-container {padding-top: 2rem; padding-bottom: 3rem; max-width: 1180px;}
-      .hero {padding: 1.25rem 1.4rem; border: 1px solid rgba(128,128,128,.25); border-radius: 14px; margin-bottom: 1rem;}
+      .hero {padding: 1.25rem 1.4rem; border: 1px solid rgba(128,128,128,.25); border-top: 1px solid rgba(128,128,128,.4); border-radius: 14px; margin-top: 1px; margin-bottom: 1rem; box-shadow: inset 0 1px 0 rgba(255,255,255,.035);}
       .muted {opacity: .72;}
       div[data-testid="stExpander"] {
         border: 1px solid rgba(128,128,128,.28);
