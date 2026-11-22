@@ -10,6 +10,8 @@ import streamlit as st
 
 from reporting import (
     REQUIRED_COLUMNS,
+    apply_column_mapping,
+    suggest_column_mapping,
     build_pdf_report,
     build_xlsx_report,
     clean_and_validate,
@@ -92,6 +94,36 @@ if raw_df is None:
         mime="text/csv",
     )
     st.stop()
+
+if data_source == "Upload a file" and raw_df is not None:
+    st.subheader("Match your spreadsheet columns")
+    st.write("We suggest mappings from your headers. Review them before continuing.")
+    suggestions = suggest_column_mapping(list(raw_df.columns))
+    mapping = {}
+    options = ["— Not mapped —", *[str(c) for c in raw_df.columns]]
+    cols = st.columns(2)
+    for index, target in enumerate(REQUIRED_COLUMNS):
+        suggested = suggestions.get(target)
+        default_index = options.index(suggested) if suggested in options else 0
+        with cols[index % 2]:
+            choice = st.selectbox(
+                target.replace("_", " ").title(),
+                options,
+                index=default_index,
+                key=f"column_map_{target}",
+            )
+        if choice != "— Not mapped —":
+            mapping[target] = choice
+
+    duplicate_sources = len(mapping.values()) != len(set(mapping.values()))
+    missing_targets = [target for target in REQUIRED_COLUMNS if target not in mapping]
+    if duplicate_sources:
+        st.error("A source column is mapped more than once. Choose a different column for each field.")
+        st.stop()
+    if missing_targets:
+        st.warning("Please map all required fields: " + ", ".join(missing_targets))
+        st.stop()
+    raw_df = apply_column_mapping(raw_df, mapping)
 
 cleaned, validation = clean_and_validate(raw_df)
 
