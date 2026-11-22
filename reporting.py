@@ -113,7 +113,7 @@ def clean_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]
 
     # Treat blank campaign/channel labels as missing, not valid categories.
     for col in ["campaign", "channel"]:
-        df[col] = df[col].replace(r"^\\s*$", pd.NA, regex=True)
+        df[col] = df[col].replace(r"^\s*$", pd.NA, regex=True)
 
     required_non_null = ["date", "campaign", "channel", *NUMERIC_COLUMNS]
     valid_mask = df[required_non_null].notna().all(axis=1)
