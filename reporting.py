@@ -21,6 +21,51 @@ def load_uploaded_file(uploaded_file: Any) -> pd.DataFrame:
     raise ValueError("Unsupported file type. Please upload CSV or XLSX.")
 
 
+
+COLUMN_ALIASES = {
+    "date": ["date", "day", "report_date", "reporting_date", "time"],
+    "campaign": ["campaign", "campaign_name", "campaigns", "ad_campaign", "campaign_title"],
+    "channel": ["channel", "platform", "source", "network", "publisher", "media_source"],
+    "spend": ["spend", "cost", "amount_spent", "ad_spend", "total_spend", "amount"],
+    "impressions": ["impressions", "impression", "views", "reach_impressions"],
+    "clicks": ["clicks", "link_clicks", "outbound_clicks", "total_clicks"],
+    "conversions": ["conversions", "conversion", "purchases", "leads", "results"],
+    "revenue": ["revenue", "sales", "conversion_value", "purchase_value", "total_revenue"],
+}
+
+
+def _normalise_header(value: Any) -> str:
+    """Convert a source header into a comparable token."""
+    return "".join(ch for ch in str(value).strip().lower() if ch.isalnum())
+
+
+def suggest_column_mapping(columns: list[Any]) -> dict[str, str]:
+    """Suggest source-header to ClientReport-field mappings using conservative aliases."""
+    normalised = {_normalise_header(col): str(col) for col in columns}
+    mapping: dict[str, str] = {}
+    used: set[str] = set()
+    for target in REQUIRED_COLUMNS:
+        candidates = [target, *COLUMN_ALIASES.get(target, [])]
+        for candidate in candidates:
+            source = normalised.get(_normalise_header(candidate))
+            if source is not None and source not in used:
+                mapping[target] = source
+                used.add(source)
+                break
+    return mapping
+
+
+def apply_column_mapping(raw: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
+    """Return a copy with mapped source headers renamed to canonical field names."""
+    if raw is None:
+        return pd.DataFrame()
+    selected = {target: source for target, source in mapping.items()
+                if target in REQUIRED_COLUMNS and source in raw.columns and source}
+    if len(set(selected.values())) != len(selected):
+        raise ValueError("Each source column can only be mapped to one reporting field.")
+    result = raw.rename(columns={source: target for target, source in selected.items()}).copy()
+    return result
+
 def clean_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Normalise headers, coerce types, remove unusable rows, and report data quality."""
     if raw is None or raw.empty:
